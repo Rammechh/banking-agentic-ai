@@ -3,7 +3,13 @@ from pydantic import BaseModel
 from datetime import datetime, timedelta
 import uuid
 
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+import sys, os
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "agents"))
+from coordinator import coordinator
 app = FastAPI(title="Mock Bank API")
+app.mount("/ui", StaticFiles(directory="static", html=True), name="static")
 
 # ---------- Fake seeded data ----------
 accounts_db = {
@@ -110,3 +116,20 @@ def update_kyc(account_id: str, body: KYCUpdateRequest):
         "document_type": body.document_type
     })
     return {"request_id": request_id, "status": "under_review", "message": "KYC documents received, verification in progress"}
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+class ChatRequest(BaseModel):
+    message: str
+    account_id: str = "AC001"
+
+@app.post("/chat")
+async def chat(body: ChatRequest):
+    result = await coordinator(body.message, account_id=body.account_id)
+    return {"response": result}
